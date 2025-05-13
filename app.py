@@ -21,6 +21,9 @@ st.markdown("""
     line-height: 1.6;
     margin-bottom: 20px;
 }
+.stTextArea [data-baseweb=base-input] {
+    background-color: #f8f9fa;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -33,18 +36,22 @@ st.title("🎬 短视频文案仿写与优化工具")
 
 # 侧边栏 - API设置
 with st.sidebar:
-    st.header("API 设置")
+    st.header("🔑 API 设置")
     api_key = st.text_input("DeepSeek API Key", type="password", help="以 sk- 开头的API密钥")
     st.markdown("---")
-    st.info("""
-    使用说明：
+    st.markdown("""
+    **使用说明：**
     1. 输入参考文案和创作需求
     2. 点击分析或生成按钮
     3. 可对生成结果进行优化
+    
+    **注意事项：**
+    - API Key仅在本会话中使用
+    - 不会存储在任何服务器上
     """)
 
 # 主界面
-tab1, tab2 = st.tabs(["文案生成", "文案优化"])
+tab1, tab2 = st.tabs(["📝 文案生成", "✨ 文案优化"])
 
 with tab1:
     # 第一部分：参考文案分析
@@ -52,7 +59,8 @@ with tab1:
     reference_text = st.text_area(
         "粘贴你想参考的短视频文案：",
         height=200,
-        placeholder="例如：很多人问我，30岁转行还来得及吗？其实我就是..."
+        placeholder="例如：很多人问我，30岁转行还来得及吗？其实我就是...",
+        key="reference"
     )
     
     if st.button("📊 拆解文案结构与网感", disabled=not (reference_text and api_key)):
@@ -79,29 +87,33 @@ with tab1:
                         "model": "deepseek-chat",
                         "messages": [{"role": "user", "content": prompt}],
                         "temperature": 0.5
-                    }
+                    },
+                    timeout=30
                 )
                 response.raise_for_status()
                 data = response.json()
                 
                 if data.get('choices') and data['choices'][0]:
-                    st.markdown("### 文案结构与网感分析：")
+                    st.markdown("### 📖 文案结构与网感分析：")
                     st.markdown(data['choices'][0]['message']['content'], unsafe_allow_html=True)
                 else:
-                    st.error("分析失败：" + json.dumps(data, ensure_ascii=False))
+                    st.error("分析失败，API返回异常：" + json.dumps(data, ensure_ascii=False, indent=2))
+            except requests.exceptions.RequestException as e:
+                st.error(f"网络请求失败：{str(e)}")
             except Exception as e:
-                st.error(f"请求出错：{str(e)}")
+                st.error(f"处理出错：{str(e)}")
 
     # 第二部分：文案生成
     st.subheader("② 新文案生成")
     description = st.text_area(
         "输入你的视频创作需求：",
         height=150,
-        placeholder="例如：我要写一个适合小红书分享的自律类文案，适合打工人，语气轻松自嘲..."
+        placeholder="例如：我要写一个适合小红书分享的自律类文案，适合打工人，语气轻松自嘲...",
+        key="description"
     )
     
-    if st.button("✏️ 生成仿写文案", disabled=not (reference_text and description and api_key)):
-        with st.spinner("正在生成新文案..."):
+    if st.button("✏️ 生成仿写文案", disabled=not (reference_text and description and api_key), key="generate"):
+        with st.spinner("正在生成新文案，请稍候..."):
             prompt = f"""请参考以下短视频文案风格：
 {reference_text}
 
@@ -121,36 +133,40 @@ with tab1:
                         "model": "deepseek-chat",
                         "messages": [{"role": "user", "content": prompt}],
                         "temperature": 0.6
-                    }
+                    },
+                    timeout=45
                 )
                 response.raise_for_status()
                 data = response.json()
                 
                 if data.get('choices') and data['choices'][0]:
                     st.session_state.last_generated = data['choices'][0]['message']['content']
-                    st.markdown("### 生成的新文案：")
+                    st.markdown("### 📜 生成的新文案：")
                     st.markdown(st.session_state.last_generated, unsafe_allow_html=True)
                 else:
-                    st.error("生成失败：" + json.dumps(data, ensure_ascii=False))
+                    st.error("生成失败，API返回异常：" + json.dumps(data, ensure_ascii=False, indent=2))
+            except requests.exceptions.RequestException as e:
+                st.error(f"网络请求失败：{str(e)}")
             except Exception as e:
-                st.error(f"请求出错：{str(e)}")
+                st.error(f"处理出错：{str(e)}")
 
 with tab2:
     st.subheader("③ 文案优化")
     if not st.session_state.last_generated:
-        st.warning("请先在'文案生成'标签页生成文案")
+        st.warning("⚠️ 请先在'文案生成'标签页生成文案")
     else:
         st.markdown("### 当前文案：")
-        st.markdown(st.session_state.last_generated, unsafe_allow_html=True)
+        st.markdown(f'<div class="markdown-box">{st.session_state.last_generated}</div>', unsafe_allow_html=True)
         
         feedback = st.text_area(
             "输入修改建议：",
             height=150,
-            placeholder="例如：希望更轻松一点，更像聊天语气，少用"你知道吗"开头"
+            placeholder="例如：希望更轻松一点，更像聊天语气，少用"你知道吗"开头",
+            key="feedback"
         )
         
-        if st.button("🔁 优化文案", disabled=not (feedback and api_key)):
-            with st.spinner("正在优化文案..."):
+        if st.button("🔁 优化文案", disabled=not (feedback and api_key), key="revise"):
+            with st.spinner("正在根据您的建议优化文案..."):
                 prompt = f"""这是我刚刚生成的短视频文案：
 
 {st.session_state.last_generated}
@@ -173,16 +189,23 @@ with tab2:
                             "model": "deepseek-chat",
                             "messages": [{"role": "user", "content": prompt}],
                             "temperature": 0.6
-                        }
+                        },
+                        timeout=45
                     )
                     response.raise_for_status()
                     data = response.json()
                     
                     if data.get('choices') and data['choices'][0]:
                         st.session_state.last_generated = data['choices'][0]['message']['content']
-                        st.markdown("### 优化后的文案：")
-                        st.markdown(st.session_state.last_generated, unsafe_allow_html=True)
+                        st.markdown("### ✨ 优化后的文案：")
+                        st.markdown(f'<div class="markdown-box">{st.session_state.last_generated}</div>', unsafe_allow_html=True)
                     else:
-                        st.error("优化失败：" + json.dumps(data, ensure_ascii=False))
+                        st.error("优化失败，API返回异常：" + json.dumps(data, ensure_ascii=False, indent=2))
+                except requests.exceptions.RequestException as e:
+                    st.error(f"网络请求失败：{str(e)}")
                 except Exception as e:
-                    st.error(f"请求出错：{str(e)}")
+                    st.error(f"处理出错：{str(e)}")
+
+# 页脚
+st.markdown("---")
+st.caption("🎥 短视频文案仿写工具 | 使用DeepSeek API | 请妥善保管您的API Key")
