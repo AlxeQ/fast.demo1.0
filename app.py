@@ -161,7 +161,7 @@ with tab2:
         feedback = st.text_area(
             "输入修改建议：",
             height=150,
-            placeholder="例如：希望更轻松一点，更像聊天语气，少用"你知道吗"开头",
+            placeholder='例如：希望更轻松一点，更像聊天语气，少用"你知道吗"开头',  # 这里修改为单引号包裹
             key="feedback"
         )
         
